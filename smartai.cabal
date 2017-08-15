@@ -35,13 +35,18 @@ executable smartai
                  mtl >= 2.0 && < 3.0,
                  containers >= 0.4 && < 1.0, 
                  transformers >= 0.3 && < 1.0,
-                 lens >= 3.0
+                 lens >= 3.0,
+                 tensorflow-opgen,
+                 tensorflow-proto,
+                 tensorflow-ops,
+                 tensorflow-core-ops,
+                 tensorflow-logging,
+                 tensorflow-test,
+                 tensorflow
 
   Extensions: FlexibleContexts,
               FlexibleInstances,
               MultiParamTypeClasses,
               RecordWildCards,
               BangPatterns,
-              TypeSynonymInstances,
-              TemplateHaskell
-
+              TypeSynonymInstances

@@ -1,0 +1,3 @@
+[submodule "tensorflow-haskell"]
+	path = tensorflow-haskell
+	url = https://github.com/tensorflow/haskell.git
