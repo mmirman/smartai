@@ -1,0 +1,47 @@
+Name: smartai
+
+Version: 0.0.0.0
+
+Description:         I dont even
+
+Synopsis:            Smarter
+
+Homepage:            https://github.com/mmirman/smartai
+
+License:             GPL-3
+
+License-file:        LICENSE
+
+Author:              Matthew Mirman
+
+Maintainer:          Matthew Mirman <matt@mirman.com>
+
+Category:            Meep
+
+Build-type: Simple
+
+Cabal-version: >= 1.6
+
+Source-repository head
+  Type:     git
+  Location: git://github.com/mmirman/smartai.git
+
+executable smartai
+  hs-source-dirs: sources
+
+  main-is: Main.hs
+
+  Build-depends: base >= 4.0 && < 6.0,
+                 mtl >= 2.0 && < 3.0,
+                 containers >= 0.4 && < 1.0, 
+                 transformers >= 0.3 && < 1.0,
+                 lens >= 3.0
+
+  Extensions: FlexibleContexts,
+              FlexibleInstances,
+              MultiParamTypeClasses,
+              RecordWildCards,
+              BangPatterns,
+              TypeSynonymInstances,
+              TemplateHaskell
+
