@@ -41,7 +41,7 @@ executable smartai
                  tensorflow-ops,
                  tensorflow-core-ops,
                  tensorflow-logging,
-                 tensorflow-test,
+                 tensorflow-records,
                  tensorflow
 
   Extensions: FlexibleContexts,
