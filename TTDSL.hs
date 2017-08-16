@@ -6,7 +6,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE GADTs #-}
 module TTDSL where
 
 import Control.Monad.Writer.Lazy
@@ -38,62 +37,75 @@ initializedRandomParam len shape = do
 type Input v = FTensor Value
 type Output v = FTensor Build
 
-data Data
-data Func
+data Model i = Model { modelInputs    :: [FTensor Value]
+                     , modelVariables :: [FVar]
+                     , modelOutputs :: [FTensor Build]
+                     }
 
-data Model t i where
-  Functional ::  [FTensor Value] -> [FVar] ->  [FTensor Build] -> Model Func (a -> b)
-  Data :: [FVar] -> [FTensor Build] -> Model Data i
+data Phant a = Phant
 
-getModelOuts :: Model t i -> [Output i]
-getModelOuts (Functional _ _ outs) = outs
-getModelOuts (Data _ outs) = outs
+class Encodable a where
+  getEncodingShape :: Phant a -> Shape
+  encodeInTensor :: a -> TensorData Float
+  
+class BuildMagic i o | i -> o where
+  buildWriter :: MonadBuild m => i -> m (Model o)
 
-getModelIns :: Model t i -> [Input i]
-getModelIns (Functional ins _ _) = ins
-getModelIns (Data _ _) = []
-
-getModelWeights :: Model t i -> [FVar]
-getModelWeights (Functional _ w _) = w
-getModelWeights (Data w _) = w
-
-class BuildMagic i o t | i -> o t where
-  buildWriter :: MonadBuild m => i -> m (Model t o)
-
-instance BuildMagic (WriterBuild (Output a)) a Data where
+instance BuildMagic (WriterBuild (Output a)) a where
   buildWriter modelBuild = do
     (out, vars) <- build $ runWriterT modelBuild
-    return $ Data vars [out]
+    return $ Model [] vars [out]
 
-instance BuildMagic (WriterBuild [Output a]) [a] Data where
+instance BuildMagic (WriterBuild [Output a]) [a] where
   buildWriter modelBuild = do
     (out, vars) <- build $ runWriterT modelBuild
-    return $ Data vars out
+    return $ Model [] vars out
 
-instance (BuildMagic (WriterBuild a) a' Data, BuildMagic (WriterBuild b) b' Data) => BuildMagic (WriterBuild (a, b)) (a',b') Data where
+instance (BuildMagic (WriterBuild a) a', BuildMagic (WriterBuild b) b') => BuildMagic (WriterBuild (a, b)) (a',b') where
   buildWriter modelBuild = do -- this is only sound if modelBuild doesn't do IO.
     ((out1,out2), vars) <- build $ runWriterT modelBuild
-    m1 <- buildWriter (return out1 :: WriterBuild a)
-    m2 <- buildWriter (return out2 :: WriterBuild b)
-    return $ Data vars (getModelOuts m1 ++ getModelOuts m2)
-    
+    Model _ _ o1 <- buildWriter (return out1 :: WriterBuild a)
+    Model _ _ o2 <- buildWriter (return out2 :: WriterBuild b)
+    return $ Model [] vars $ o1 ++ o2
 
-instance BuildMagic r e t => BuildMagic (Input a -> r) (a -> e) Func where
+instance (Encodable a, BuildMagic r e) => BuildMagic (Input a -> r) (a -> e) where
   buildWriter modelBuild = do
-    (inp :: FTensor Value) <- placeholder []
-    m <- buildWriter (modelBuild inp)
-    return $ Functional (inp:getModelIns m) (getModelWeights m) (getModelOuts m)
+    (inp :: FTensor Value) <- placeholder $ getEncodingShape (Phant :: Phant a) 
+    Model inps vs out <- buildWriter (modelBuild inp)
+    return $ Model (inp:inps) vs out
 
 returnOutput :: Output a -> WriterBuild (Output a)
 returnOutput = return
 
-buildModelEx :: forall a m . MonadBuild m => m (Model Func (a -> ()))
+buildModelEx :: forall a m . (Encodable a, MonadBuild m) => m (Model (a -> ()))
 buildModelEx = buildWriter $ \(input_one :: Input a) -> do -- should get converted automatically into placeholders.
   returnOutput undefined
 
 
 
-compose :: Model Func (a -> b) -> Model Func (b -> c) -> Model Func (a -> c)
+compose :: MonadBuild m => Model (a -> b) -> Model (b -> c) -> m (Model (a -> c))
 compose = undefined
 
---apply :: Model (a -> b) -> Model a -> Model (a -> c)
+apply :: MonadBuild m => Model (a -> b) -> Model a -> m (Model b)
+apply = undefined
+
+
+abstract :: forall m a b . (MonadBuild m, Encodable a) => (Input a -> Model b) -> m (Model (a -> b))
+abstract foo = do
+  (inp :: Input a) <- placeholder $ getEncodingShape (Phant :: Phant a)
+  let Model inps vars outs = foo inp
+  return $ Model (inp:inps) vars outs
+
+
+applyVal :: (Encodable a) => Model (a -> b) -> a -> (Feed, Model b)
+applyVal (Model (i:r) vs outs) a = (feed i $ encodeInTensor a, Model r vs outs)
+
+class ApplyVals a r b | a r -> b where
+  applyVals :: Model a -> r -> ([Feed], Model b)
+instance ApplyVals a () a where
+  applyVals m () = ([], m)
+instance (Encodable a, ApplyVals b r c) => ApplyVals (a -> b) (a,r) c where
+  applyVals (Model (i:r) vs outs) (a,rest) = (feed i (encodeInTensor a):fd, m)
+    where (fd, m) = applyVals (Model r vs outs :: Model b) rest
+    
+  
