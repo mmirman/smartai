@@ -107,5 +107,3 @@ instance ApplyVals a () a where
 instance (Encodable a, ApplyVals b r c) => ApplyVals (a -> b) (a,r) c where
   applyVals (Model (i:r) vs outs) (a,rest) = (feed i (encodeInTensor a):fd, m)
     where (fd, m) = applyVals (Model r vs outs :: Model b) rest
-    
-  
