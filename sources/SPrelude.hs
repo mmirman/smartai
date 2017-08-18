@@ -15,6 +15,7 @@ import TensorFlow.Core as TF
 import TensorFlow.Minimize as TF
 import TensorFlow.Variable as TF
 import TensorFlow.Core as TF
+import TensorFlow.Tensor as TF
 import TensorFlow.Ops as TF hiding (assign, assign', variable, variable', initializedVariable, initializedVariable', zeroInitializedVariable, zeroInitializedVariable', abs, concat, sum)
 import Data.Int as TF
 
