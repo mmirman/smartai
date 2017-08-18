@@ -125,6 +125,7 @@ instance (Encodable a, ApplyVals b r c) => ApplyVals (a -> b) (a,r) c where
     (fd, m) <- applyVals (mmodel $ Model r vs outs :: MModel b) rest    
     return (feed i (encodeInTensor a):fd, m)
 
+-- this isn't great - every iteration is going to end up back on the CPU.
 simpleTrainModel :: forall a i o v . (ApplyVals a i o, Encodable a, Encodable o) => MModel a -> [(i, o)] -> MModel (o -> o -> Float) -> (forall m . MonadBuild m => FNode -> [Variable Float] -> m ControlNode) -> MModel a
 simpleTrainModel totrain dataset loss_model minimizer = MModel $ do
   let feeder :: i -> o -> Session ()
@@ -133,7 +134,7 @@ simpleTrainModel totrain dataset loss_model minimizer = MModel $ do
         (feed, final_loss) <- applyVal (apply mo loss_model) label
         Model [] vars [out] <- unMModel final_loss
         trainStep <- minimizer out vars
-        runWithFeeds_ feeds trainStep
+        runWithFeeds_ (feed:feeds) trainStep
   undefined
 
 ------------------
