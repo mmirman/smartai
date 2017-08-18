@@ -90,30 +90,42 @@ initializedParam initializer = do
 initializedRandomParam :: Int64 -> Shape -> WriterBuild FNode
 initializedRandomParam len shape = initializedParam =<< randomParam len shape
 
+--------------------
+-- Model Calculus --
+--------------------
 -- the result can be destroyed by using the second model elsewhere!!
-compose :: MModel (a -> b) -> MModel (b -> c) -> MModel (a -> c)
+compose :: Encodable b => MModel (a -> b) -> MModel (b -> c) -> MModel (a -> c)
 compose m1 m2 = MModel $ do
   Model ins vars outs <- unMModel m1
   Model ins' vars' outs' <- unMModel m2
   sequence_ $ zipWith assign ins' outs
   return $ Model ins (vars ++ vars') outs'
 
-apply :: MModel a -> MModel (a -> b) ->  MModel b
+apply :: Encodable a => MModel a -> MModel (a -> b) ->  MModel b
 apply m1 m2 = MModel $ do
-  Model ins vars outs <- unMModel m1
+  Model [] vars outs <- unMModel m1
   Model ins' vars' outs' <- unMModel m2
   sequence_ $ zipWith assign ins' outs
-  return $ Model ins (vars ++ vars') outs'  
+  return $ Model [] (vars ++ vars') outs'
+
+-- freeze the first module for every use in the second.
+-- can be used for convolutions and stuff.  
+letIn :: MModel a -> (MModel a -> MModel b) -> MModel b
+letIn mm1 fm2 = MModel $ do
+  Model i1 v1 o1 <- unMModel mm1
+  Model i2 v2 o2 <- unMModel $ fm2 $ mmodel $ Model i1 [] o1
+  return $ Model i2 (v1 ++ v2) o2
+
+
+
 
 ---------------------
 -- Training Models --
 ---------------------
-
 applyVal :: (Encodable a, MonadBuild m) => MModel (a -> b) -> a -> m (Feed, MModel b)
 applyVal m1 a = do
   Model (i:r) vs outs <- unMModel m1
   return (feed i $ encodeInTensor a, mmodel $ Model r vs outs)
-
 
 class ApplyVals a r b | a r -> b where
   applyVals :: MonadBuild m => MModel a -> r -> m ([Feed], MModel b)
